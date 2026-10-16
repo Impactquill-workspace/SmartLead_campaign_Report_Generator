@@ -1,0 +1,855 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Smartlead Campaign Analytics & Reporting</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#eef2ff',
+              100: '#e0e7ff',
+              500: '#6366f1',
+              600: '#4f46e5',
+              700: '#4338ca',
+            },
+            excel: {
+              header: '#D9EAD3',
+              headerBorder: '#B2D8A5',
+              totalBg: '#F2F2F2',
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    body { font-family: 'Inter', sans-serif; }
+    .excel-th {
+      background-color: #D9EAD3 !important;
+      color: #111827 !important;
+      border-bottom: 2px solid #B2D8A5 !important;
+    }
+    .total-tr {
+      background-color: #F8FAFC !important;
+      border-top: 2px solid #94A3B8 !important;
+      border-bottom: 2px solid #94A3B8 !important;
+    }
+    /* Custom scrollbar for wide 13-column table */
+    .table-container::-webkit-scrollbar {
+      height: 8px;
+    }
+    .table-container::-webkit-scrollbar-track {
+      background: #f1f5f9;
+    }
+    .table-container::-webkit-scrollbar-thumb {
+      background: #cbd5e1;
+      border-radius: 4px;
+    }
+    .table-container::-webkit-scrollbar-thumb:hover {
+      background: #94a3b8;
+    }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-800 min-h-screen antialiased flex flex-col">
+
+  <!-- Toast Notification Container -->
+  <div id="toast-container" class="fixed bottom-5 right-5 z-50 flex flex-col gap-2 pointer-events-none"></div>
+
+  <!-- Loading Modal / Overlay -->
+  <div id="loading-overlay" class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 hidden flex-col items-center justify-center transition-all">
+    <div class="bg-white p-6 rounded-2xl shadow-2xl flex flex-col items-center gap-4 max-w-sm text-center border border-slate-100">
+      <div class="w-12 h-12 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin"></div>
+      <div>
+        <h4 class="font-bold text-slate-900 text-lg">Fetching Analytics</h4>
+        <p class="text-sm text-slate-500 mt-1">Aggregating campaign performance and delivery data from Smartlead API...</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Top Navbar -->
+  <nav class="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-xs">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="flex justify-between h-16 items-center">
+        <div class="flex items-center gap-3">
+          <div class="bg-indigo-600 text-white p-2 rounded-xl shadow-md flex items-center justify-center">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+            </svg>
+          </div>
+          <div>
+            <h1 class="text-lg font-bold text-slate-900 leading-tight">Smartlead Analytics & Reporting Hub</h1>
+            <p class="text-xs text-slate-500">Live Delivery, Bounce & Reply Analytics Dashboard</p>
+          </div>
+        </div>
+        <div class="flex items-center gap-4">
+          <div class="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-50 text-emerald-700 text-xs font-semibold border border-emerald-200">
+            <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+            Smartlead API Ready
+          </div>
+          <span id="gen-timestamp" class="text-xs text-slate-400"></span>
+        </div>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Main Container -->
+  <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 flex flex-col gap-6">
+
+    <!-- Error Banner -->
+    <div id="error-banner" class="hidden bg-rose-50 border border-rose-200 rounded-xl p-4 text-rose-800 shadow-sm animate-fade-in">
+      <div class="flex items-start gap-3">
+        <svg class="w-5 h-5 text-rose-600 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+          <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clip-rule="evenodd"></path>
+        </svg>
+        <div class="flex-1">
+          <h3 id="error-title" class="font-bold text-sm">Failed to generate report</h3>
+          <p id="error-desc" class="text-xs text-rose-700 mt-1"></p>
+        </div>
+        <button onclick="document.getElementById('error-banner').classList.add('hidden')" class="text-rose-500 hover:text-rose-800">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+        </button>
+      </div>
+    </div>
+
+    <!-- User Input Control Center Card -->
+    <section class="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 transition-all">
+      <div class="flex flex-col lg:flex-row lg:items-end justify-between gap-5">
+        
+        <!-- Filters & Inputs -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 flex-1">
+          
+          <!-- Report Mode / Preset -->
+          <div class="flex flex-col gap-1.5">
+            <label class="text-xs font-bold text-slate-600 uppercase tracking-wider">Report Period</label>
+            <select id="mode-select" onchange="handleModeChange()" class="w-full bg-slate-50 border border-slate-300 hover:border-slate-400 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 text-slate-800 text-sm rounded-lg px-3 py-2 transition-all font-medium">
+              <option value="ALL_TIME">All-Time (Dashboard Lifetime)</option>
+              <option value="LAST_7_DAYS" selected>Last 7 Days</option>
+              <option value="LAST_WEEK">Last Calendar Week (Mon-Sun)</option>
+              <option value="THIS_MONTH">This Month</option>
+              <option value="LAST_30_DAYS">Last 30 Days</option>
+              <option value="CUSTOM">Custom Date Range...</option>
+            </select>
+          </div>
+
+          <!-- Start Date -->
+          <div class="flex flex-col gap-1.5" id="group-start-date">
+            <label class="text-xs font-bold text-slate-600 uppercase tracking-wider">Start Date</label>
+            <input type="date" id="start-date" class="w-full bg-slate-50 border border-slate-300 hover:border-slate-400 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 text-slate-800 text-sm rounded-lg px-3 py-2 transition-all font-medium">
+          </div>
+
+          <!-- End Date -->
+          <div class="flex flex-col gap-1.5" id="group-end-date">
+            <label class="text-xs font-bold text-slate-600 uppercase tracking-wider">End Date</label>
+            <input type="date" id="end-date" class="w-full bg-slate-50 border border-slate-300 hover:border-slate-400 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 text-slate-800 text-sm rounded-lg px-3 py-2 transition-all font-medium">
+          </div>
+
+          <!-- Status Filter -->
+          <div class="flex flex-col gap-1.5">
+            <label class="text-xs font-bold text-slate-600 uppercase tracking-wider">Campaign Status</label>
+            <select id="status-filter" class="w-full bg-slate-50 border border-slate-300 hover:border-slate-400 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 text-slate-800 text-sm rounded-lg px-3 py-2 transition-all font-medium">
+              <option value="ACTIVE" selected>ACTIVE Campaigns Only</option>
+              <option value="PAUSED">PAUSED Campaigns</option>
+              <option value="COMPLETED">COMPLETED Campaigns</option>
+              <option value="ALL">All Campaigns (Any Status)</option>
+            </select>
+          </div>
+
+          <!-- Specific Campaign Filter -->
+          <div class="flex flex-col gap-1.5">
+            <label class="text-xs font-bold text-slate-600 uppercase tracking-wider">Campaign Name (Optional)</label>
+            <input type="text" id="campaign-input" placeholder="All (or type name...)" class="w-full bg-slate-50 border border-slate-300 hover:border-slate-400 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 text-slate-800 text-sm rounded-lg px-3 py-2 transition-all font-medium">
+          </div>
+
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="flex flex-wrap items-center gap-2.5 pt-2 lg:pt-0">
+          
+          <button id="btn-fetch" onclick="fetchReport()" class="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl font-semibold text-sm bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white shadow-sm hover:shadow transition-all cursor-pointer">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+            </svg>
+            Fetch Analytics
+          </button>
+
+          <button id="btn-excel" onclick="downloadExcel()" class="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl font-semibold text-sm bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white shadow-sm hover:shadow transition-all cursor-pointer">
+            <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+              <path fill-rule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clip-rule="evenodd" />
+            </svg>
+            Download Excel (.xlsx)
+          </button>
+
+          <button id="btn-csv" onclick="downloadCSV()" class="inline-flex items-center justify-center gap-1.5 px-3.5 py-2.5 rounded-xl font-semibold text-sm bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 shadow-xs transition-all cursor-pointer" title="Export as CSV">
+            <svg class="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+            </svg>
+            CSV
+          </button>
+
+          <button onclick="copySummaryToClipboard()" class="inline-flex items-center justify-center gap-1.5 px-3.5 py-2.5 rounded-xl font-semibold text-sm bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 shadow-xs transition-all cursor-pointer" title="Copy Text Summary to Clipboard">
+            <svg class="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"></path>
+            </svg>
+            Copy Summary
+          </button>
+
+        </div>
+
+      </div>
+    </section>
+
+    <!-- Top KPI Executive Cards (6 Cards) -->
+    <section class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+      
+      <!-- Card 1: Campaigns -->
+      <div class="bg-white rounded-xl p-4 border border-slate-200 shadow-xs flex flex-col justify-between">
+        <span class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Active Campaigns</span>
+        <div class="flex items-baseline justify-between mt-2">
+          <span id="kpi-campaigns" class="text-2xl font-bold text-slate-900">-</span>
+          <span class="text-xs px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 font-medium">Count</span>
+        </div>
+        <div class="text-[11px] text-slate-400 mt-1" id="kpi-clients-sub">- Clients</div>
+      </div>
+
+      <!-- Card 2: Total Leads -->
+      <div class="bg-white rounded-xl p-4 border border-slate-200 shadow-xs flex flex-col justify-between">
+        <span class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Unique Leads</span>
+        <div class="flex items-baseline justify-between mt-2">
+          <span id="kpi-leads" class="text-2xl font-bold text-slate-900">-</span>
+          <span class="text-xs px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 font-medium">Targeted</span>
+        </div>
+        <div class="text-[11px] text-slate-400 mt-1">Uploaded leads</div>
+      </div>
+
+      <!-- Card 3: Total Sent -->
+      <div class="bg-white rounded-xl p-4 border border-slate-200 shadow-xs flex flex-col justify-between">
+        <span class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Emails Sent</span>
+        <div class="flex items-baseline justify-between mt-2">
+          <span id="kpi-sent" class="text-2xl font-bold text-slate-900">-</span>
+          <span class="text-xs px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 font-medium">Volume</span>
+        </div>
+        <div class="text-[11px] text-slate-400 mt-1">Total touches</div>
+      </div>
+
+      <!-- Card 4: Total Bounced -->
+      <div class="bg-white rounded-xl p-4 border border-slate-200 shadow-xs flex flex-col justify-between">
+        <span class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Total Bounced</span>
+        <div class="flex items-baseline justify-between mt-2">
+          <span id="kpi-bounced" class="text-2xl font-bold text-slate-900">-</span>
+          <span id="kpi-bounce-rate-badge" class="text-xs px-2 py-0.5 rounded-full font-bold">-%</span>
+        </div>
+        <div class="text-[11px] text-slate-500 mt-1 flex justify-between">
+          <span>Rate: <strong id="kpi-bounce-rate">0.00%</strong></span>
+          <span id="kpi-mimecast-sub" class="text-slate-400">Mimecast: 0</span>
+        </div>
+      </div>
+
+      <!-- Card 5: Total Replies -->
+      <div class="bg-white rounded-xl p-4 border border-slate-200 shadow-xs flex flex-col justify-between">
+        <span class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Total Replies</span>
+        <div class="flex items-baseline justify-between mt-2">
+          <span id="kpi-replies" class="text-2xl font-bold text-slate-900">-</span>
+          <span id="kpi-reply-rate-badge" class="text-xs px-2 py-0.5 rounded-full bg-purple-50 text-purple-700 font-bold">-%</span>
+        </div>
+        <div class="text-[11px] text-slate-500 mt-1">
+          <span>Reply Rate: <strong id="kpi-reply-rate">0.00%</strong></span>
+        </div>
+      </div>
+
+      <!-- Card 6: Positive Replies -->
+      <div class="bg-white rounded-xl p-4 border border-slate-200 shadow-xs flex flex-col justify-between">
+        <span class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Positive Replies</span>
+        <div class="flex items-baseline justify-between mt-2">
+          <span id="kpi-positive-replies" class="text-2xl font-bold text-slate-900">-</span>
+          <span id="kpi-pos-rate-badge" class="text-xs px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 font-bold">-%</span>
+        </div>
+        <div class="text-[11px] text-slate-500 mt-1">
+          <span>Pos Rate: <strong id="kpi-positive-rate">0.00%</strong></span>
+        </div>
+      </div>
+
+    </section>
+
+    <!-- Table Section -->
+    <section class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
+      
+      <!-- Table Header & Filters Toolbar -->
+      <div class="p-4 sm:p-5 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-slate-50/50">
+        <div class="flex items-center gap-3">
+          <h2 class="text-base font-bold text-slate-900">Campaign Performance Breakdown</h2>
+          <span id="table-badge-count" class="text-xs bg-indigo-50 text-indigo-700 font-bold px-2.5 py-0.5 rounded-full border border-indigo-100">
+            0 Campaigns
+          </span>
+        </div>
+
+        <div class="flex flex-wrap items-center gap-3">
+          <!-- Bounce Threshold Quick Filter -->
+          <select id="bounce-threshold-filter" onchange="filterAndRenderTable()" class="bg-white border border-slate-300 text-xs rounded-lg px-2.5 py-2 text-slate-700 font-medium focus:ring-1 focus:ring-indigo-500">
+            <option value="ALL">All Bounce Rates</option>
+            <option value="WARN">⚠️ Warning & Risk (> 2%)</option>
+            <option value="DANGER">🚨 High Risk Only (> 5%)</option>
+            <option value="HEALTHY">🟢 Healthy Only (≤ 2%)</option>
+          </select>
+
+          <!-- Client Filter (Populated dynamically) -->
+          <select id="client-select-filter" onchange="filterAndRenderTable()" class="bg-white border border-slate-300 text-xs rounded-lg px-2.5 py-2 text-slate-700 font-medium focus:ring-1 focus:ring-indigo-500">
+            <option value="ALL">All Clients / Accounts</option>
+          </select>
+
+          <!-- Search Box -->
+          <div class="relative min-w-[240px]">
+            <input type="text" id="campaign-search" oninput="filterAndRenderTable()" placeholder="Search campaign name..." class="w-full bg-white border border-slate-300 text-xs rounded-lg pl-8 pr-3 py-2 text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-indigo-500">
+            <svg class="w-4 h-4 text-slate-400 absolute left-2.5 top-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+            </svg>
+          </div>
+        </div>
+      </div>
+
+      <!-- Scrollable 13-Column Table -->
+      <div class="table-container overflow-x-auto w-full">
+        <table class="min-w-full text-xs text-left border-collapse whitespace-nowrap">
+          <thead>
+            <tr>
+              <th onclick="sortTable('date_range')" class="excel-th px-3 py-3 font-bold text-center cursor-pointer select-none">
+                Date Range <span id="sort-icon-date_range"></span>
+              </th>
+              <th onclick="sortTable('campaign_name')" class="excel-th px-4 py-3 font-bold cursor-pointer select-none min-w-[240px]">
+                Campaign Name <span id="sort-icon-campaign_name"></span>
+              </th>
+              <th onclick="sortTable('total_leads')" class="excel-th px-3 py-3 font-bold text-right cursor-pointer select-none">
+                Total Leads <span id="sort-icon-total_leads"></span>
+              </th>
+              <th onclick="sortTable('total_sent')" class="excel-th px-3 py-3 font-bold text-right cursor-pointer select-none">
+                Total sent <span id="sort-icon-total_sent"></span>
+              </th>
+              <th onclick="sortTable('total_bounced')" class="excel-th px-3 py-3 font-bold text-right cursor-pointer select-none">
+                Total bounce no <span id="sort-icon-total_bounced"></span>
+              </th>
+              <th onclick="sortTable('bounce_percentage')" class="excel-th px-3 py-3 font-bold text-right cursor-pointer select-none">
+                Bounce percentage <span id="sort-icon-bounce_percentage"></span>
+              </th>
+              <th onclick="sortTable('total_blocked')" class="excel-th px-3 py-3 font-bold text-right cursor-pointer select-none">
+                Blocked Emails <span id="sort-icon-total_blocked"></span>
+              </th>
+              <th onclick="sortTable('total_invalid')" class="excel-th px-3 py-3 font-bold text-right cursor-pointer select-none">
+                Invalid Emails <span id="sort-icon-total_invalid"></span>
+              </th>
+              <th onclick="sortTable('total_replies')" class="excel-th px-3 py-3 font-bold text-right cursor-pointer select-none">
+                Reply Count <span id="sort-icon-total_replies"></span>
+              </th>
+              <th onclick="sortTable('reply_percentage')" class="excel-th px-3 py-3 font-bold text-right cursor-pointer select-none">
+                Reply percentage <span id="sort-icon-reply_percentage"></span>
+              </th>
+              <th onclick="sortTable('positive_replies')" class="excel-th px-3 py-3 font-bold text-right cursor-pointer select-none">
+                Positive Replies <span id="sort-icon-positive_replies"></span>
+              </th>
+              <th onclick="sortTable('positive_reply_percentage')" class="excel-th px-3 py-3 font-bold text-right cursor-pointer select-none">
+                Positive Reply % <span id="sort-icon-positive_reply_percentage"></span>
+              </th>
+              <th onclick="sortTable('mimecast_bounces')" class="excel-th px-3 py-3 font-bold text-right cursor-pointer select-none">
+                Mimecast Bounces <span id="sort-icon-mimecast_bounces"></span>
+              </th>
+            </tr>
+          </thead>
+          <tbody id="campaign-tbody" class="divide-y divide-slate-200">
+            <tr>
+              <td colspan="13" class="text-center py-16 text-slate-500">
+                <div class="flex flex-col items-center justify-center gap-3">
+                  <div class="p-3 bg-indigo-50 text-indigo-600 rounded-2xl shadow-xs">
+                    <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                    </svg>
+                  </div>
+                  <div class="text-center">
+                    <p class="font-bold text-slate-800 text-sm">Ready to Fetch Campaign Data</p>
+                    <p class="text-xs text-slate-400 mt-1 max-w-md">Apna date range, campaign status ya campaign name input karein aur upar <strong>"Fetch Analytics"</strong> button dabayein taaki sirf aapke input ka data nikle.</p>
+                  </div>
+                </div>
+              </td>
+            </tr>
+          </tbody>
+          <!-- 13-Column Total Row (Matching Excel Sheet 1) -->
+          <tfoot id="campaign-tfoot" class="total-tr font-bold text-slate-900"></tfoot>
+        </table>
+      </div>
+
+      <!-- Table Footer Status Note -->
+      <div class="px-4 py-3 bg-slate-50 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between text-xs text-slate-500 gap-2">
+        <div class="flex items-center gap-2">
+          <span>Threshold Guide:</span>
+          <span class="inline-flex items-center gap-1 font-semibold text-emerald-700 bg-emerald-100/60 px-2 py-0.5 rounded">🟢 &le; 2.0% Safe</span>
+          <span class="inline-flex items-center gap-1 font-semibold text-amber-700 bg-amber-100/60 px-2 py-0.5 rounded">🟡 2.0% - 5.0% Warning</span>
+          <span class="inline-flex items-center gap-1 font-semibold text-rose-700 bg-rose-100/60 px-2 py-0.5 rounded">🔴 &gt; 5.0% High Risk</span>
+        </div>
+        <div id="footer-summary-note" class="text-slate-400 font-medium"></div>
+      </div>
+
+    </section>
+
+  </main>
+
+  <footer class="bg-white border-t border-slate-200 py-4 mt-auto">
+    <div class="max-w-7xl mx-auto px-4 text-center text-xs text-slate-400">
+      Smartlead Active Campaign Delivery & Bounce Analytics Integration &bull; Export matches official Excel Report format.
+    </div>
+  </footer>
+
+  <script>
+    // State management
+    let reportData = null;
+    let currentSort = { column: 'campaign_name', order: 'asc' };
+
+    // Formatters
+    function formatNum(num) {
+      if (num === null || num === undefined) return '0';
+      return Number(num).toLocaleString();
+    }
+
+    function formatPct(val) {
+      if (val === null || val === undefined) return '0.00%';
+      return Number(val).toFixed(2) + '%';
+    }
+
+    function getBounceBadge(rate) {
+      const val = parseFloat(rate) || 0;
+      if (val <= 2.0) {
+        return `<span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold bg-emerald-100 text-emerald-800">${val.toFixed(2)}%</span>`;
+      } else if (val <= 5.0) {
+        return `<span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold bg-amber-100 text-amber-800">${val.toFixed(2)}%</span>`;
+      } else {
+        return `<span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold bg-rose-100 text-rose-800">${val.toFixed(2)}%</span>`;
+      }
+    }
+
+    // Toast Notification helper
+    function showToast(message, type = 'info') {
+      const container = document.getElementById('toast-container');
+      const toast = document.createElement('div');
+      const bg = type === 'success' ? 'bg-emerald-600' : type === 'error' ? 'bg-rose-600' : 'bg-slate-800';
+      toast.className = `${bg} text-white text-xs font-semibold px-4 py-2.5 rounded-xl shadow-lg pointer-events-auto flex items-center gap-2 transition-all transform duration-200 translate-y-2 opacity-0`;
+      toast.innerHTML = `
+        <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+        </svg>
+        <span>${message}</span>
+      `;
+      container.appendChild(toast);
+      setTimeout(() => {
+        toast.classList.remove('translate-y-2', 'opacity-0');
+      }, 10);
+      setTimeout(() => {
+        toast.classList.add('opacity-0', 'translate-y-2');
+        setTimeout(() => toast.remove(), 300);
+      }, 3000);
+    }
+
+    // Preset Date Calculation
+    function handleModeChange() {
+      const mode = document.getElementById('mode-select').value;
+      const startInput = document.getElementById('start-date');
+      const endInput = document.getElementById('end-date');
+      const today = new Date();
+
+      function toYMD(d) {
+        return d.toISOString().split('T')[0];
+      }
+
+      if (mode === 'ALL_TIME') {
+        startInput.value = '';
+        endInput.value = '';
+      } else if (mode === 'LAST_7_DAYS') {
+        const start = new Date(today);
+        start.setDate(today.getDate() - 7);
+        startInput.value = toYMD(start);
+        endInput.value = toYMD(today);
+      } else if (mode === 'LAST_WEEK') {
+        // Previous Monday to Sunday
+        const dayOfWeek = today.getDay(); // 0 is Sun, 1 is Mon
+        const distToPrevMonday = (dayOfWeek === 0 ? 6 : dayOfWeek - 1) + 7;
+        const prevMon = new Date(today);
+        prevMon.setDate(today.getDate() - distToPrevMonday);
+        const prevSun = new Date(prevMon);
+        prevSun.setDate(prevMon.getDate() + 6);
+        startInput.value = toYMD(prevMon);
+        endInput.value = toYMD(prevSun);
+      } else if (mode === 'THIS_MONTH') {
+        const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
+        startInput.value = toYMD(firstDay);
+        endInput.value = toYMD(today);
+      } else if (mode === 'LAST_30_DAYS') {
+        const start = new Date(today);
+        start.setDate(today.getDate() - 30);
+        startInput.value = toYMD(start);
+        endInput.value = toYMD(today);
+      }
+    }
+
+    // Fetch Report from FastAPI endpoint
+    async function fetchReport() {
+      const overlay = document.getElementById('loading-overlay');
+      overlay.classList.remove('hidden');
+      overlay.classList.add('flex');
+
+      const mode = document.getElementById('mode-select').value;
+      const startDate = document.getElementById('start-date').value;
+      const endDate = document.getElementById('end-date').value;
+      const status = document.getElementById('status-filter').value;
+      const campaignName = (document.getElementById('campaign-input')?.value || '').trim();
+
+      const params = new URLSearchParams();
+      if (mode === 'ALL_TIME') {
+        params.append('all_time', 'true');
+      } else {
+        if (startDate) params.append('start_date', startDate);
+        if (endDate) params.append('end_date', endDate);
+      }
+      if (status) params.append('status', status);
+      if (campaignName) params.append('campaign_search', campaignName);
+
+      const url = `/api/reports/weekly?${params.toString()}`;
+      const errBanner = document.getElementById('error-banner');
+
+      try {
+        const res = await fetch(url);
+        if (!res.ok) {
+          const errJson = await res.json().catch(() => ({}));
+          const errMsg = errJson.detail || errJson.message || `Server returned status ${res.status}`;
+          document.getElementById('error-title').innerText = res.status === 401 ? 'Authentication Failed (Smartlead API)' : 'Failed to fetch report';
+          document.getElementById('error-desc').innerText = errMsg;
+          errBanner.classList.remove('hidden');
+          return;
+        }
+
+        errBanner.classList.add('hidden');
+        reportData = await res.json();
+        renderKPIs(reportData);
+        populateClientFilter(reportData);
+        filterAndRenderTable();
+        showToast('Report data loaded successfully', 'success');
+
+      } catch (err) {
+        document.getElementById('error-title').innerText = 'Network Connection Error';
+        document.getElementById('error-desc').innerText = err.message;
+        errBanner.classList.remove('hidden');
+      } finally {
+        overlay.classList.add('hidden');
+        overlay.classList.remove('flex');
+      }
+    }
+
+    // Render 6 Top KPI Cards
+    function renderKPIs(data) {
+      if (!data) return;
+
+      document.getElementById('gen-timestamp').innerText = data.generated_at ? `Updated: ${data.generated_at}` : '';
+      document.getElementById('kpi-campaigns').innerText = formatNum(data.total_campaigns || (data.campaigns ? data.campaigns.length : 0));
+      document.getElementById('kpi-clients-sub').innerText = `${data.total_clients || 0} Account(s)`;
+
+      document.getElementById('kpi-leads').innerText = formatNum(data.total_leads || 0);
+      document.getElementById('kpi-sent').innerText = formatNum(data.total_sent || 0);
+      document.getElementById('kpi-bounced').innerText = formatNum(data.total_bounced || 0);
+
+      const bRate = (data.overall_bounce_rate || 0);
+      document.getElementById('kpi-bounce-rate').innerText = bRate.toFixed(2) + '%';
+      document.getElementById('kpi-bounce-rate-badge').innerHTML = getBounceBadge(bRate);
+      document.getElementById('kpi-mimecast-sub').innerText = `Mimecast: ${formatNum(data.total_mimecast_bounces || 0)}`;
+
+      const rRate = (data.overall_reply_rate || 0);
+      document.getElementById('kpi-replies').innerText = formatNum(data.total_replies || 0);
+      document.getElementById('kpi-reply-rate').innerText = rRate.toFixed(2) + '%';
+      document.getElementById('kpi-reply-rate-badge').innerText = rRate.toFixed(2) + '%';
+
+      const pRate = (data.overall_positive_reply_rate || 0);
+      document.getElementById('kpi-positive-replies').innerText = formatNum(data.total_positive_replies || 0);
+      document.getElementById('kpi-positive-rate').innerText = pRate.toFixed(2) + '%';
+      document.getElementById('kpi-pos-rate-badge').innerText = pRate.toFixed(2) + '%';
+    }
+
+    // Populate Client dropdown
+    function populateClientFilter(data) {
+      const select = document.getElementById('client-select-filter');
+      const currVal = select.value;
+      select.innerHTML = '<option value="ALL">All Clients / Accounts</option>';
+
+      if (data && data.clients && data.clients.length > 0) {
+        data.clients.forEach(c => {
+          const opt = document.createElement('option');
+          opt.value = c.client_id;
+          opt.textContent = c.client_name;
+          select.appendChild(opt);
+        });
+      }
+      select.value = currVal;
+    }
+
+    // Table Column Sorting
+    function sortTable(column) {
+      if (currentSort.column === column) {
+        currentSort.order = currentSort.order === 'asc' ? 'desc' : 'asc';
+      } else {
+        currentSort.column = column;
+        currentSort.order = 'desc';
+      }
+      filterAndRenderTable();
+    }
+
+    // Filter, Sort and Render Table Rows (13 Columns + Total Row)
+    function filterAndRenderTable() {
+      if (!reportData || !reportData.campaigns) return;
+
+      const search = (document.getElementById('campaign-search').value || '').toLowerCase().trim();
+      const threshold = document.getElementById('bounce-threshold-filter').value;
+      const clientFilter = document.getElementById('client-select-filter').value;
+
+      // Filter
+      let campaigns = reportData.campaigns.filter(c => {
+        // Name Search
+        const nameMatch = (c.campaign_name || '').toLowerCase().includes(search) || (c.client_name || '').toLowerCase().includes(search);
+        if (!nameMatch) return false;
+
+        // Client Filter
+        if (clientFilter !== 'ALL' && String(c.client_id) !== String(clientFilter)) {
+          return false;
+        }
+
+        // Threshold Filter
+        const rate = parseFloat(c.bounce_percentage) || 0;
+        if (threshold === 'WARN' && rate <= 2.0) return false;
+        if (threshold === 'DANGER' && rate <= 5.0) return false;
+        if (threshold === 'HEALTHY' && rate > 2.0) return false;
+
+        return true;
+      });
+
+      // Sort
+      const col = currentSort.column;
+      const ord = currentSort.order === 'asc' ? 1 : -1;
+      campaigns.sort((a, b) => {
+        let va = a[col] ?? 0;
+        let vb = b[col] ?? 0;
+        if (typeof va === 'string') {
+          return va.localeCompare(vb) * ord;
+        }
+        return (va - vb) * ord;
+      });
+
+      // Update badge count
+      document.getElementById('table-badge-count').innerText = `${campaigns.length} Campaigns`;
+
+      // Render Rows
+      const tbody = document.getElementById('campaign-tbody');
+      tbody.innerHTML = '';
+
+      if (campaigns.length === 0) {
+        tbody.innerHTML = `
+          <tr>
+            <td colspan="13" class="text-center py-12 text-slate-400">
+              No campaigns found matching selected filters.
+            </td>
+          </tr>
+        `;
+        document.getElementById('campaign-tfoot').innerHTML = '';
+        return;
+      }
+
+      let sumLeads = 0;
+      let sumSent = 0;
+      let sumBounced = 0;
+      let sumBlocked = 0;
+      let sumInvalid = 0;
+      let sumReplies = 0;
+      let sumPosReplies = 0;
+      let sumMimecast = 0;
+
+      campaigns.forEach(c => {
+        sumLeads += (c.total_leads || 0);
+        sumSent += (c.total_sent || 0);
+        sumBounced += (c.total_bounced || 0);
+        sumBlocked += (c.total_blocked || 0);
+        sumInvalid += (c.total_invalid || 0);
+        sumReplies += (c.total_replies || 0);
+        sumPosReplies += (c.positive_replies || 0);
+        sumMimecast += (c.mimecast_bounces || 0);
+
+        const tr = document.createElement('tr');
+        tr.className = 'hover:bg-slate-50 transition-colors border-b border-slate-100';
+        tr.innerHTML = `
+          <td class="px-3 py-3 text-center text-slate-500 font-medium">${c.date_range || reportData.date_range_str || 'All Time'}</td>
+          <td class="px-4 py-3 font-semibold text-slate-900">
+            <div class="flex items-center gap-2">
+              <span>${escapeHtml(c.campaign_name)}</span>
+              ${c.status && c.status !== 'ACTIVE' ? `<span class="text-[10px] uppercase font-bold px-1.5 py-0.5 rounded bg-slate-100 text-slate-600">${c.status}</span>` : ''}
+            </div>
+            ${c.client_name ? `<span class="text-[10px] text-slate-400 block">${escapeHtml(c.client_name)}</span>` : ''}
+          </td>
+          <td class="px-3 py-3 text-right font-medium text-slate-700">${formatNum(c.total_leads)}</td>
+          <td class="px-3 py-3 text-right font-semibold text-slate-900">${formatNum(c.total_sent)}</td>
+          <td class="px-3 py-3 text-right font-medium text-slate-700">${formatNum(c.total_bounced)}</td>
+          <td class="px-3 py-3 text-right">${getBounceBadge(c.bounce_percentage)}</td>
+          <td class="px-3 py-3 text-right text-slate-600">${formatNum(c.total_blocked)}</td>
+          <td class="px-3 py-3 text-right text-slate-600">${formatNum(c.total_invalid)}</td>
+          <td class="px-3 py-3 text-right font-medium text-slate-800">${formatNum(c.total_replies)}</td>
+          <td class="px-3 py-3 text-right text-slate-600">${formatPct(c.reply_percentage)}</td>
+          <td class="px-3 py-3 text-right font-semibold text-emerald-700">${formatNum(c.positive_replies)}</td>
+          <td class="px-3 py-3 text-right text-emerald-700 font-medium">${formatPct(c.positive_reply_percentage)}</td>
+          <td class="px-3 py-3 text-right text-slate-600">${formatNum(c.mimecast_bounces)}</td>
+        `;
+        tbody.appendChild(tr);
+      });
+
+      // Render Total row in footer matching Sheet 1 of Excel
+      const leadsForRate = sumLeads > 0 ? sumLeads : sumSent;
+      const overallBounceRate = leadsForRate > 0 ? (sumBounced / leadsForRate * 100) : 0.0;
+      const deliveredEmails = Math.max(0, sumSent - sumBounced);
+      const overallReplyRate = deliveredEmails > 0 ? (sumReplies / deliveredEmails * 100) : 0.0;
+      const overallPosRate = sumReplies > 0 ? (sumPosReplies / sumReplies * 100) : 0.0;
+
+      const tfoot = document.getElementById('campaign-tfoot');
+      tfoot.innerHTML = `
+        <tr class="total-tr">
+          <td class="px-3 py-3.5 text-center">Total</td>
+          <td class="px-4 py-3.5">Active Campaigns: ${campaigns.length}</td>
+          <td class="px-3 py-3.5 text-right">${formatNum(sumLeads)}</td>
+          <td class="px-3 py-3.5 text-right">${formatNum(sumSent)}</td>
+          <td class="px-3 py-3.5 text-right">${formatNum(sumBounced)}</td>
+          <td class="px-3 py-3.5 text-right">${getBounceBadge(overallBounceRate)}</td>
+          <td class="px-3 py-3.5 text-right">${formatNum(sumBlocked)}</td>
+          <td class="px-3 py-3.5 text-right">${formatNum(sumInvalid)}</td>
+          <td class="px-3 py-3.5 text-right">${formatNum(sumReplies)}</td>
+          <td class="px-3 py-3.5 text-right">${formatPct(overallReplyRate)}</td>
+          <td class="px-3 py-3.5 text-right text-emerald-700">${formatNum(sumPosReplies)}</td>
+          <td class="px-3 py-3.5 text-right text-emerald-700">${formatPct(overallPosRate)}</td>
+          <td class="px-3 py-3.5 text-right">${formatNum(sumMimecast)}</td>
+        </tr>
+      `;
+
+      document.getElementById('footer-summary-note').innerText =
+        `Displaying ${campaigns.length} campaigns &bull; Period: ${reportData.period_start || ''} to ${reportData.period_end || ''}`;
+    }
+
+    function escapeHtml(str) {
+      if (!str) return '';
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+    }
+
+    // Direct Excel Export using FastAPI backend endpoint
+    function downloadExcel() {
+      const mode = document.getElementById('mode-select').value;
+      const startDate = document.getElementById('start-date').value;
+      const endDate = document.getElementById('end-date').value;
+      const status = document.getElementById('status-filter').value;
+      const campaignName = (document.getElementById('campaign-input')?.value || '').trim();
+
+      const params = new URLSearchParams();
+      if (mode === 'ALL_TIME') {
+        params.append('all_time', 'true');
+      } else {
+        if (startDate) params.append('start_date', startDate);
+        if (endDate) params.append('end_date', endDate);
+      }
+      if (status) params.append('status', status);
+      if (campaignName) params.append('campaign_search', campaignName);
+
+      showToast('Generating official 13-column Excel report...', 'info');
+      window.location.href = `/api/reports/weekly/export?${params.toString()}`;
+    }
+
+    // Direct Client-Side CSV Export
+    function downloadCSV() {
+      if (!reportData || !reportData.campaigns || reportData.campaigns.length === 0) {
+        showToast('No data available to export', 'error');
+        return;
+      }
+
+      const headers = [
+        "Date Range",
+        "Campaign Name",
+        "Total Leads",
+        "Total sent",
+        "Total bounce no",
+        "Bounce percentage",
+        "Blocked Emails",
+        "Invalid Emails",
+        "Reply Count",
+        "Reply percentage",
+        "Positive Replies",
+        "Positive Reply percentage",
+        "Mimecast Bounces"
+      ];
+
+      const rows = reportData.campaigns.map(c => [
+        `"${c.date_range || reportData.date_range_str || 'All Time'}"`,
+        `"${(c.campaign_name || '').replace(/"/g, '""')}"`,
+        c.total_leads || 0,
+        c.total_sent || 0,
+        c.total_bounced || 0,
+        `"${formatPct(c.bounce_percentage)}"`,
+        c.total_blocked || 0,
+        c.total_invalid || 0,
+        c.total_replies || 0,
+        `"${formatPct(c.reply_percentage)}"`,
+        c.positive_replies || 0,
+        `"${formatPct(c.positive_reply_percentage)}"`,
+        c.mimecast_bounces || 0
+      ]);
+
+      const csvContent = [headers.join(','), ...rows.map(e => e.join(','))].join('\n');
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.setAttribute('href', url);
+      link.setAttribute('download', `smartlead_campaign_report_${Date.now()}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      showToast('CSV Export downloaded', 'success');
+    }
+
+    // Copy formatted executive summary to clipboard
+    function copySummaryToClipboard() {
+      if (!reportData) {
+        showToast('Please fetch analytics report first', 'error');
+        return;
+      }
+
+      const text = `📊 SMARTLEAD CAMPAIGN REPORT SUMMARY
+Period: ${reportData.period_start} to ${reportData.period_end}
+Total Active Campaigns: ${formatNum(reportData.total_campaigns)}
+Total Leads Contacted: ${formatNum(reportData.total_leads)}
+Total Emails Sent: ${formatNum(reportData.total_sent)}
+Total Bounced: ${formatNum(reportData.total_bounced)} (${(reportData.overall_bounce_rate || 0).toFixed(2)}%)
+Blocked Emails: ${formatNum(reportData.total_blocked)}
+Invalid Emails: ${formatNum(reportData.total_invalid)}
+Total Replies: ${formatNum(reportData.total_replies)} (${(reportData.overall_reply_rate || 0).toFixed(2)}%)
+Positive Replies: ${formatNum(reportData.total_positive_replies)} (${(reportData.overall_positive_reply_rate || 0).toFixed(2)}%)
+Mimecast Bounces: ${formatNum(reportData.total_mimecast_bounces)}
+Generated: ${reportData.generated_at || 'Just now'}`;
+
+      navigator.clipboard.writeText(text).then(() => {
+        showToast('Summary copied to clipboard!', 'success');
+      }).catch(err => {
+        showToast('Failed to copy to clipboard', 'error');
+      });
+    }
+
+    // Initial Load on Page Ready: Initialize presets only, do NOT auto-fetch data
+    document.addEventListener('DOMContentLoaded', () => {
+      handleModeChange();
+    });
+  </script>
+</body>
+</html>
